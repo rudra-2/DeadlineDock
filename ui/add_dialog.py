@@ -1,130 +1,130 @@
-
 """
-DeadlineDock
-ui/add_dialog.py
-
-Dialog used for creating and editing deadlines.
+DeadlineDock AddDialog
+----------------------
+Compact floating sheet. Enter saves, Esc closes.
 """
 
-from datetime import datetime
-
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDateEdit,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QLineEdit,
-    QMessageBox,
-    QPlainTextEdit,
-    QVBoxLayout,
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton, QWidget
 )
+from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtGui import QKeyEvent
 
+from app.config import WINDOW_WIDTH, CONTENT_MARGIN, DIALOG_SLIDE_MS
 from app.models import Deadline
+from app.animations import SlideAnimation
+from ui.styles import dialog_style
 
 
 class AddDialog(QDialog):
-    def __init__(self, deadline: Deadline | None = None, parent=None):
+    deadline_saved = Signal(Deadline)
+
+    def __init__(self, parent=None, edit_deadline: Deadline = None):
         super().__init__(parent)
+        self.edit_mode = edit_deadline is not None
+        self.deadline = edit_deadline or Deadline()
 
-        self.deadline = deadline
+        self.setObjectName("AddDialog")
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setFixedSize(WINDOW_WIDTH - 40, 420)
 
-        self.setWindowTitle("New Deadline" if deadline is None else "Edit Deadline")
-        self.setModal(True)
-        self.resize(420, 330)
+        # Position centered over parent
+        if parent:
+            geo = self.geometry()
+            parent_geo = parent.geometry()
+            x = parent_geo.x() + (parent_geo.width() - geo.width()) // 2
+            y = parent_geo.y() + (parent_geo.height() - geo.height()) // 2
+            self.move(x, y)
 
-        self._build_ui()
-        self._apply_style()
+        self.setStyleSheet(dialog_style())
 
-        if deadline:
-            self._load(deadline)
-
-    def _build_ui(self):
+        # Main layout
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(CONTENT_MARGIN, 20, CONTENT_MARGIN, 20)
+        layout.setSpacing(16)
 
-        form = QFormLayout()
+        # Title
+        title = QLabel("Edit Deadline" if self.edit_mode else "New Deadline")
+        title.setObjectName("DialogTitle")
+        layout.addWidget(title)
 
-        self.title_edit = QLineEdit()
-        self.title_edit.setPlaceholderText("Honors Project Form")
+        # Title field
+        layout.addWidget(self._label("Title"))
+        self.inp_title = QLineEdit()
+        self.inp_title.setText(self.deadline.title)
+        self.inp_title.setPlaceholderText("e.g. Honors Project Form")
+        layout.addWidget(self.inp_title)
 
-        self.date_edit = QDateEdit()
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDate(datetime.today())
+        # Date field
+        layout.addWidget(self._label("Due Date"))
+        self.inp_date = QLineEdit()
+        self.inp_date.setText(self.deadline.due_date)
+        self.inp_date.setPlaceholderText("YYYY-MM-DD")
+        layout.addWidget(self.inp_date)
 
-        self.url_edit = QLineEdit()
-        self.url_edit.setPlaceholderText("https://...")
+        # URL field
+        layout.addWidget(self._label("URL (optional)"))
+        self.inp_url = QLineEdit()
+        self.inp_url.setText(self.deadline.url)
+        self.inp_url.setPlaceholderText("https://...")
+        layout.addWidget(self.inp_url)
 
-        self.notes_edit = QPlainTextEdit()
-        self.notes_edit.setPlaceholderText("Optional notes")
-        self.notes_edit.setFixedHeight(90)
+        # Notes field
+        layout.addWidget(self._label("Notes (optional)"))
+        self.inp_notes = QTextEdit()
+        self.inp_notes.setText(self.deadline.notes)
+        self.inp_notes.setPlaceholderText("Any extra details...")
+        self.inp_notes.setMaximumHeight(80)
+        layout.addWidget(self.inp_notes)
 
-        form.addRow("Title", self.title_edit)
-        form.addRow("Due Date", self.date_edit)
-        form.addRow("URL", self.url_edit)
-        form.addRow("Notes", self.notes_edit)
+        layout.addStretch()
 
-        layout.addLayout(form)
+        # Buttons
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
 
-        self.buttons = QDialogButtonBox(
-            QDialogButtonBox.Save | QDialogButtonBox.Cancel
-        )
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setObjectName("CancelButton")
+        self.btn_cancel.clicked.connect(self.reject)
 
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
+        self.btn_save = QPushButton("Save")
+        self.btn_save.setObjectName("SaveButton")
+        self.btn_save.setDefault(True)
+        self.btn_save.clicked.connect(self._save)
 
-        layout.addWidget(self.buttons)
+        btn_row.addWidget(self.btn_cancel)
+        btn_row.addWidget(self.btn_save)
+        layout.addLayout(btn_row)
 
-    def _apply_style(self):
-        self.setStyleSheet("""
-        QDialog{
-            background:rgba(24,24,24,235);
-            border:1px solid rgba(255,255,255,0.10);
-            border-radius:18px;
-        }
+        # Focus title
+        QTimer.singleShot(50, self.inp_title.setFocus)
 
-        QLabel{
-            color:#F5F5F7;
-        }
+        # Entry animation
+        self.slide = SlideAnimation(self, distance=12, duration_ms=DIALOG_SLIDE_MS)
+        QTimer.singleShot(10, self.slide.slide_in_from_top)
 
-        QLineEdit,QPlainTextEdit,QDateEdit{
-            background:rgba(255,255,255,0.06);
-            border:1px solid rgba(255,255,255,0.10);
-            border-radius:10px;
-            padding:8px;
-            color:white;
-        }
+    def _label(self, text: str) -> QLabel:
+        lbl = QLabel(text)
+        lbl.setObjectName("FieldLabel")
+        return lbl
 
-        QPushButton{
-            min-width:90px;
-        }
-        """)
-
-    def _load(self, d: Deadline):
-        self.title_edit.setText(d.title)
-        self.date_edit.setDate(d.due_date)
-        self.url_edit.setText(d.url)
-        self.notes_edit.setPlainText(d.notes)
-
-    def accept(self):
-        if not self.title_edit.text().strip():
-            QMessageBox.warning(
-                self,
-                "Missing Title",
-                "Please enter a deadline title."
-            )
+    def _save(self):
+        title = self.inp_title.text().strip()
+        date_str = self.inp_date.text().strip()
+        if not title or not date_str:
             return
 
-        super().accept()
+        self.deadline.title = title
+        self.deadline.due_date = date_str
+        self.deadline.url = self.inp_url.text().strip()
+        self.deadline.notes = self.inp_notes.toPlainText().strip()
 
-    def get_deadline(self) -> Deadline:
-        if self.deadline:
-            d = self.deadline
+        self.deadline_saved.emit(self.deadline)
+        self.accept()
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
         else:
-            d = Deadline()
-
-        d.title = self.title_edit.text().strip()
-        d.url = self.url_edit.text().strip()
-        d.notes = self.notes_edit.toPlainText().strip()
-        d.due_date = self.date_edit.date().toPython()
-
-        return d
+            super().keyPressEvent(event)

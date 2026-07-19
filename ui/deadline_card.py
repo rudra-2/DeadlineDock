@@ -1,125 +1,124 @@
-
 """
-DeadlineDock
-ui/deadline_card.py
-
-A minimalist glassmorphism deadline card.
+DeadlineDock DeadlineCard
+-------------------------
+Compact glass card with status rail, hover lift, and context menu.
 """
 
-from PySide6.QtCore import Qt, Signal
+import webbrowser
 from PySide6.QtWidgets import (
-    QWidget,
-    QFrame,
-    QLabel,
-    QHBoxLayout,
-    QVBoxLayout,
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QGraphicsDropShadowEffect, QMenu
 )
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QMouseEvent, QColor, QCursor
 
+from app.config import CARD_HEIGHT, CARD_RADIUS, CARD_SPACING, STATUS_RAIL_WIDTH, SMALL_SIZE
 from app.models import Deadline
-from app.utils import open_url
+from app.utils import relative_date, format_absolute
+from app.theme import STATUS_COLORS, GLASS_FILL, GLASS_FILL_HOVER, GLASS_BORDER, GLASS_BORDER_HOVER
+from ui.styles import card_style, card_hover_style
 
 
-class DeadlineCard(QFrame):
-    clicked = Signal(object)
-    deleteRequested = Signal(str)
-    editRequested = Signal(object)
+class DeadlineCard(QWidget):
+    clicked = Signal(Deadline)
+    edit_requested = Signal(Deadline)
+    delete_requested = Signal(str)
 
     def __init__(self, deadline: Deadline, parent=None):
         super().__init__(parent)
-
         self.deadline = deadline
-
         self.setObjectName("DeadlineCard")
+        self.setFixedHeight(CARD_HEIGHT)
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(78)
+        self.setStyleSheet(card_style(deadline.status))
 
-        self._build_ui()
-        self.refresh()
+        # Shadow effect (subtle, shown on hover)
+        self.shadow = QGraphicsDropShadowEffect(self)
+        self.shadow.setBlurRadius(0)
+        self.shadow.setColor(QColor(0, 0, 0, 0))
+        self.shadow.setOffset(0, 0)
+        self.setGraphicsEffect(self.shadow)
 
-    def _build_ui(self):
-        root = QHBoxLayout(self)
-        root.setContentsMargins(14, 12, 14, 12)
-        root.setSpacing(12)
+        # Layout
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 16, 0)
+        layout.setSpacing(0)
 
-        self.status = QWidget()
-        self.status.setFixedWidth(4)
-        self.status.setObjectName("StatusBar")
+        # Status rail
+        self.rail = QWidget()
+        self.rail.setFixedWidth(STATUS_RAIL_WIDTH)
+        self.rail.setStyleSheet(
+            f"background: {STATUS_COLORS.get(deadline.status, '#50D890')};"
+            f"border-top-left-radius: {CARD_RADIUS}px;"
+            f"border-bottom-left-radius: {CARD_RADIUS}px;"
+        )
+        layout.addWidget(self.rail)
 
-        root.addWidget(self.status)
-
-        text_layout = QVBoxLayout()
+        # Text content
+        text_container = QWidget()
+        text_layout = QVBoxLayout(text_container)
+        text_layout.setContentsMargins(14, 10, 0, 10)
         text_layout.setSpacing(2)
 
-        self.dateLabel = QLabel()
-        self.dateLabel.setObjectName("Date")
+        # Top row: absolute date
+        self.lbl_date = QLabel(format_absolute(deadline.due_date))
+        self.lbl_date.setObjectName("CardDate")
+        text_layout.addWidget(self.lbl_date)
 
-        self.titleLabel = QLabel()
-        self.titleLabel.setObjectName("Title")
+        # Title
+        self.lbl_title = QLabel(deadline.title)
+        self.lbl_title.setObjectName("CardTitle")
+        text_layout.addWidget(self.lbl_title)
 
-        self.relativeLabel = QLabel()
-        self.relativeLabel.setObjectName("Relative")
+        # Relative date
+        self.lbl_relative = QLabel(relative_date(deadline.due_date))
+        self.lbl_relative.setObjectName("CardRelative")
+        text_layout.addWidget(self.lbl_relative)
 
-        text_layout.addWidget(self.dateLabel)
-        text_layout.addWidget(self.titleLabel)
-        text_layout.addWidget(self.relativeLabel)
+        layout.addWidget(text_container, 1)
 
-        root.addLayout(text_layout, 1)
+        # Completed indicator (if applicable)
+        if deadline.completed:
+            self.lbl_relative.setText("Completed")
 
-        self.setStyleSheet("""
-        QFrame#DeadlineCard{
-            background:rgba(255,255,255,0.08);
-            border:1px solid rgba(255,255,255,0.10);
-            border-radius:14px;
-        }
+    # --- interaction ---
 
-        QWidget#StatusBar{
-            border-radius:2px;
-        }
+    def enterEvent(self, event):
+        self.setStyleSheet(card_hover_style(self.deadline.status))
+        self.shadow.setBlurRadius(16)
+        self.shadow.setColor(QColor(0, 0, 0, 40))
+        self.shadow.setOffset(0, 4)
+        super().enterEvent(event)
 
-        QLabel#Date{
-            color:#B8B8C2;
-            font-size:11px;
-        }
+    def leaveEvent(self, event):
+        self.setStyleSheet(card_style(self.deadline.status))
+        self.shadow.setBlurRadius(0)
+        self.shadow.setColor(QColor(0, 0, 0, 0))
+        self.shadow.setOffset(0, 0)
+        super().leaveEvent(event)
 
-        QLabel#Title{
-            color:#F5F5F7;
-            font-size:14px;
-            font-weight:600;
-        }
-
-        QLabel#Relative{
-            color:#7D7D86;
-            font-size:10px;
-        }
-        """)
-
-    def refresh(self):
-        self.dateLabel.setText(self.deadline.formatted_date)
-        self.titleLabel.setText(self.deadline.title)
-        self.relativeLabel.setText(self.deadline.relative_text)
-        self.status.setStyleSheet(
-            f"background:{self.deadline.status_color};border-radius:2px;"
-        )
-
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
-            self.clicked.emit(self.deadline)
             if self.deadline.url:
-                open_url(self.deadline.url)
-        super().mousePressEvent(event)
+                webbrowser.open(self.deadline.url)
+            else:
+                self.clicked.emit(self.deadline)
+        elif event.button() == Qt.RightButton:
+            self._show_context_menu(event.globalPosition().toPoint())
 
-    def contextMenuEvent(self, event):
-        from PySide6.QtWidgets import QMenu
-
+    def _show_context_menu(self, pos):
         menu = QMenu(self)
+        menu.setStyleSheet(self.styleSheet())
 
-        edit_action = menu.addAction("Edit")
-        delete_action = menu.addAction("Delete")
+        act_edit = menu.addAction("Edit")
+        act_delete = menu.addAction("Delete")
+        if self.deadline.url:
+            act_copy = menu.addAction("Copy URL")
 
-        chosen = menu.exec(event.globalPos())
-
-        if chosen == edit_action:
-            self.editRequested.emit(self.deadline)
-
-        elif chosen == delete_action:
-            self.deleteRequested.emit(self.deadline.id)
+        action = menu.exec(QCursor.pos())
+        if action == act_edit:
+            self.edit_requested.emit(self.deadline)
+        elif action == act_delete:
+            self.delete_requested.emit(self.deadline.id)
+        elif self.deadline.url and action == act_copy:
+            from PySide6.QtWidgets import QApplication
+            QApplication.clipboard().setText(self.deadline.url)

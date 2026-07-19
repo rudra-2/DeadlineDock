@@ -1,95 +1,70 @@
 """
-DeadlineDock
-app/theme.py
-
-Central design system for the application.
+DeadlineDock Theme
+------------------
+Color tokens and global QSS. Kept minimal and typography-first.
 """
 
-from dataclasses import dataclass
+from app.config import *
 
-# ---------- Color Tokens ----------
+# ------------------------------------------------------------------
+# Token palette
+# ------------------------------------------------------------------
 
-BACKGROUND = "#111111"
-TEXT_PRIMARY = "#F5F5F7"
-TEXT_SECONDARY = "#B8B8C2"
-TEXT_MUTED = "#7D7D86"
+TOKENS = {
+    "bg": BACKGROUND,
+    "text": TEXT_PRIMARY,
+    "text_secondary": TEXT_SECONDARY,
+    "text_muted": TEXT_MUTED,
+    "accent": ACCENT,
+    "danger": DANGER,
+    "warning": WARNING,
+    "success": SUCCESS,
+    "glass": GLASS_FILL,
+    "glass_hover": GLASS_FILL_HOVER,
+    "border": GLASS_BORDER,
+    "border_hover": GLASS_BORDER_HOVER,
+    "overlay": CONTENT_OVERLAY,
+    "overlay_solid": CONTENT_OVERLAY_SOLID,
+    "divider": DIVIDER,
+}
 
-ACCENT = "#5C8DFF"
+STATUS_COLORS = {
+    "overdue": DANGER,
+    "today": "#FFB84D",
+    "soon": WARNING,
+    "future": SUCCESS,
+    "completed": TEXT_MUTED,
+    "unknown": TEXT_MUTED,
+}
 
-SUCCESS = "#50D890"
-WARNING = "#FFC857"
-DANGER = "#FF5A5F"
-
-GLASS_FILL = "rgba(255,255,255,0.08)"
-GLASS_FILL_HOVER = "rgba(255,255,255,0.12)"
-GLASS_BORDER = "rgba(255,255,255,0.10)"
-
-DIVIDER = "rgba(255,255,255,0.08)"
-
-# ---------- Typography ----------
-
-FONT_FAMILY = "Segoe UI Variable"
-FALLBACK_FONT = "Segoe UI"
-
-TITLE_SIZE = 20
-HEADER_SIZE = 14
-BODY_SIZE = 12
-CAPTION_SIZE = 10
-
-# ---------- Spacing ----------
-
-SPACE_2 = 2
-SPACE_4 = 4
-SPACE_8 = 8
-SPACE_12 = 12
-SPACE_16 = 16
-SPACE_20 = 20
-SPACE_24 = 24
-SPACE_32 = 32
-
-# ---------- Radius ----------
-
-WINDOW_RADIUS = 18
-CARD_RADIUS = 14
-BUTTON_RADIUS = 10
-
-# ---------- Animation ----------
-
-FAST = 120
-NORMAL = 180
-SLOW = 260
-
-# ---------- Shadows ----------
-
-@dataclass(frozen=True)
-class Shadow:
-    blur: int
-    x: int
-    y: int
-    alpha: int
-
-CARD_SHADOW = Shadow(
-    blur=24,
-    x=0,
-    y=8,
-    alpha=28
-)
-
-HOVER_SHADOW = Shadow(
-    blur=30,
-    x=0,
-    y=10,
-    alpha=40
-)
-
-# ---------- QSS ----------
+# ------------------------------------------------------------------
+# Global QSS
+# ------------------------------------------------------------------
 
 GLOBAL_QSS = f"""
 QWidget {{
+    font-family: "{FONT_FAMILY}", "{FONT_FALLBACK}", sans-serif;
     color: {TEXT_PRIMARY};
-    font-family: "{FONT_FAMILY}", "{FALLBACK_FONT}";
+    outline: none;
+}}
+
+QLineEdit, QTextEdit {{
+    background: rgba(255,255,255,0.05);
+    border: 1px solid {GLASS_BORDER};
+    border-radius: 10px;
+    padding: 10px 12px;
     font-size: {BODY_SIZE}px;
-    background: transparent;
+    color: {TEXT_PRIMARY};
+    selection-background-color: {ACCENT};
+}}
+
+QLineEdit:focus, QTextEdit:focus {{
+    border: 1px solid {ACCENT};
+}}
+
+QLineEdit::placeholder,
+QTextEdit::placeholder {{
+    color: {TEXT_MUTED};
 }}
 
 QScrollArea {{
@@ -99,17 +74,19 @@ QScrollArea {{
 
 QScrollBar:vertical {{
     background: transparent;
-    width: 8px;
-    margin: 4px;
+    width: 5px;
+    border-radius: 2px;
+    margin: 0px;
 }}
 
 QScrollBar::handle:vertical {{
-    background: rgba(255,255,255,0.18);
-    border-radius: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    min-height: 40px;
 }}
 
 QScrollBar::handle:vertical:hover {{
-    background: rgba(255,255,255,0.28);
+    background: rgba(255,255,255,0.22);
 }}
 
 QScrollBar::add-line:vertical,
@@ -117,33 +94,26 @@ QScrollBar::sub-line:vertical {{
     height: 0px;
 }}
 
-QPushButton {{
-    border: 1px solid rgba(255,255,255,0.10);
-    border-radius: {BUTTON_RADIUS}px;
-    background: rgba(255,255,255,0.08);
-    padding: 6px 10px;
-}}
-
-QPushButton:hover {{
-    background: rgba(255,255,255,0.12);
-}}
-
-QPushButton:pressed {{
-    background: rgba(255,255,255,0.16);
-}}
-
-QLineEdit,
-QPlainTextEdit,
-QTextEdit {{
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.10);
+QMenu {{
+    background: {CONTENT_OVERLAY_SOLID};
+    border: 1px solid {GLASS_BORDER};
     border-radius: 10px;
-    padding: 8px;
+    padding: 6px;
 }}
 
-QLineEdit:focus,
-QPlainTextEdit:focus,
-QTextEdit:focus {{
-    border: 1px solid {ACCENT};
+QMenu::item {{
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: {BODY_SIZE}px;
+}}
+
+QMenu::item:selected {{
+    background: {GLASS_FILL_HOVER};
+}}
+
+QMenu::separator {{
+    height: 1px;
+    background: {DIVIDER};
+    margin: 4px 10px;
 }}
 """
